@@ -21,9 +21,28 @@ echo -e "${GREEN}Starting deployment for $PROJECT_NAME${NC}"
 # Navigate to project directory
 cd $PROJECT_PATH
 
+# Check for local changes
+if ! git diff --quiet HEAD; then
+    echo -e "${YELLOW}Local changes detected. Stashing changes...${NC}"
+    git stash push -m "Auto-stash before deployment $(date)"
+fi
+
+# Check for staged changes
+if ! git diff --cached --quiet; then
+    echo -e "${YELLOW}Staged changes detected. Stashing staged changes...${NC}"
+    git stash push --staged -m "Auto-stash staged changes before deployment $(date)"
+fi
+
 # Pull latest changes
 echo -e "${YELLOW}Pulling latest changes from $BRANCH branch${NC}"
-git pull origin $BRANCH
+git fetch origin $BRANCH
+
+# Reset to latest origin state (this will discard local changes)
+echo -e "${YELLOW}Resetting to latest origin/$BRANCH${NC}"
+git reset --hard origin/$BRANCH
+
+# Clean untracked files
+git clean -fd
 
 # Install/update dependencies
 echo -e "${YELLOW}Installing dependencies${NC}"
@@ -37,7 +56,11 @@ fi
 
 # Restart PM2 process
 echo -e "${YELLOW}Restarting PM2 process${NC}"
-pm2 restart $PROJECT_NAME || pm2 start ecosystem.config.js
+if pm2 describe $PROJECT_NAME > /dev/null 2>&1; then
+    pm2 restart $PROJECT_NAME
+else
+    pm2 start ecosystem.config.js
+fi
 
 # Save PM2 configuration
 pm2 save
