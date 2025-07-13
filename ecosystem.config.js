@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'backend',
-    script: './bin/www.js', // or './dist/app.js' if using build process
+    script: './bin/www', // or './dist/app.js' if using build process
     instances: 'max',
     exec_mode: 'cluster',
     env: {
