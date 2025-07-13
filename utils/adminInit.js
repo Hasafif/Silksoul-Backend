@@ -38,7 +38,7 @@ async function initializeAdminUser() {
       adminUser = new User({
         name: 'Administrator',
         username: process.env.ADMIN_USERNAME || 'admin',
-        email: process.env.ADMIN_EMAIL || 'admin@example.com',
+        email: process.env.ADMIN_EMAIL || 'admin@silksoul.me',
         password: hashedPassword,
         role: adminRole._id
       });
@@ -57,6 +57,8 @@ async function initializeAdminUser() {
     } else {
       // Update existing admin user's password
       adminUser.password = hashedPassword;
+      adminUser.email = process.env.ADMIN_EMAIL;
+      adminUser.username = process.env.ADMIN_USERNAME;
       await adminUser.save();
       
       console.log('✓ Admin user password updated');

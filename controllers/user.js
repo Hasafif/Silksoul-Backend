@@ -56,7 +56,8 @@ var { authUser } = require("../auth");
 const jwt = require("jsonwebtoken");
 
 async function userLogin(req, res, next) {
-  const user = await User.findOne({ email: req.body.email }).populate("role");
+  try {
+ const user = await User.findOne({ email: req.body.email }).populate("role");
   console.log(user)
   const match = await authUser(req.body.password, user.password);
   if (match == true) {
@@ -71,6 +72,10 @@ async function userLogin(req, res, next) {
   } else {
     res.send("Username or password not correct.");
   }
+  } catch (error) {
+     res.send("database error.");
+  }
+ 
 }
 
 // Change user password
