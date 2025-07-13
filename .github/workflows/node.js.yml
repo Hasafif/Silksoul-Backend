@@ -34,4 +34,24 @@ jobs:
           username: ${{ secrets.USERNAME }}
           port: ${{ secrets.PORT }}
           key: ${{ secrets.SSHKEY }}
-          script: "cd /var/www/Silksoul-Backend && bash ./scripts/deploy.sh"
+          envs: MONGODB_URL,CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET,JWT_KEY,ADMIN_USERNAME,ADMIN_EMAIL,ADMIN_PASSWORD
+          script: |
+            cd /var/www/Silksoul-Backend
+            
+            # Create .env file with repository secrets
+            cat > .env << EOF
+            MONGODB_URL=${{ secrets.MONGODB_URL }}
+            CLOUD_NAME=${{ secrets.CLOUD_NAME }}
+            CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
+            CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+            JWT_KEY=${{ secrets.JWT_KEY }}
+            ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            EOF
+            
+            # Set proper permissions for .env file
+            chmod 600 .env
+            
+            # Run deployment script
+            bash ./scripts/deploy.sh
