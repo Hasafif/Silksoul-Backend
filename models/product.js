@@ -23,63 +23,42 @@ const productPurchaseSchema = new Schema({
   }
 }, { _id: false });
 
-// Main Order schema
-const orderSchema = new Schema(
-  {
-    user: { 
-      type: Schema.Types.ObjectId, 
-      ref: "User", 
-      required: true 
-    },
-    productPurchases: [productPurchaseSchema],
-    totalAmount: { 
-      type: Number, 
-      required: true 
-    },
-    status: { 
-      type: String, 
-      enum: ["pending", "completed", "cancelled", "processing", "shipped"], 
-      default: "pending" 
-    },
-    paymentMethod: { 
-      type: String 
-    },
-    shippingAddress: {
-      street: { type: String },
-      city: { type: String },
-      state: { type: String },
-      zipCode: { type: String },
-      country: { type: String }
-    },
-    orderNotes: { 
-      type: String 
-    }
+const orderSchema = new mongoose.Schema({
+  items: [{
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    quantity: Number,
+    price: Number,
+    name: String,
+    selectedSize: String,
+    selectedColor: String
+  }],
+  totalAmount: Number,
+  customerInfo: {
+    email: String,
+    firstName: String,
+    lastName: String,
+    phone: String
   },
-  {
-    timestamps: {
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  }
-);
-
-// Add indexes for better query performance
-orderSchema.index({ user: 1, status: 1 });
-orderSchema.index({ "created_at": -1 });
-
-// Pre-save middleware to calculate subtotals and total
-orderSchema.pre('save', function(next) {
-  let total = 0;
-  
-  this.productPurchases.forEach(purchase => {
-    purchase.subtotal = purchase.quantity * purchase.priceAtPurchase;
-    total += purchase.subtotal;
-  });
-  
-  this.totalAmount = total;
-  next();
+  shippingAddress: {
+    address: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String
+  },
+  actualShippingAddress: Object, // From Stripe if different
+  paymentStatus: { 
+    type: String, 
+    enum: ['pending', 'paid', 'failed', 'cancelled'],
+    default: 'pending' 
+  },
+  sessionId: String, // Stripe session ID
+  paymentIntentId: String, // Stripe payment intent ID
+  stripeCustomerId: String, // Stripe customer ID
+  createdAt: { type: Date, default: Date.now },
+  paidAt: Date,
+  cancelledAt: Date
 });
-
 // Product Schema with working middleware
 const productSchema = new Schema(
   {

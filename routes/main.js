@@ -16,7 +16,17 @@ var {
   getProduct, //  Remove product review
   getCategory
 } = require("../controllers/index");
-
+const {
+  createCheckoutSession,
+  handlePaymentSuccess,
+  getCheckoutSession,
+  getUserOrders,
+  cancelOrder,
+  handleWebhook,
+  getOrder
+} = require('../controllers/payment');
+//const authMiddleware = require('../middleware/auth');
+//router.post('/webhook',express.raw({type: 'application/json'}),handleWebhook);
 router.get("/site", showSite);
 
 router.get("/category/all", listAllCategories);
@@ -33,4 +43,12 @@ router.get("/product/show", showProduct);
 router.get("/product/review/add", addProductReview);
 router.get("/product/review/remove", removeProductReview);
 
+
+router.post('/create-checkout-session', createCheckoutSession);
+router.get('/payment-success', handlePaymentSuccess);
+router.get('/checkout-session/:sessionId', getCheckoutSession);
+router.get('/orders/user', getUserOrders);
+router.put('/orders/:id/cancel', cancelOrder);
+
+router.get('/orders/:id', getOrder);
 module.exports = router;

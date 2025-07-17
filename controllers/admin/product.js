@@ -368,17 +368,11 @@ async function deleteProduct(req, res, next) {
 // Order Management =======================================================
 async function listOrders(req, res, next) {
   try {
-    const orders = await Order.find({})
-      .populate({
-        path: 'productPurchases.product',
-        model: 'Product',
-        select: 'name price images categoryName'
-      })
-      .populate('user', 'name email')
-      .sort({ created_at: -1 });
+    const orders = await Order.find({}).sort({ created_at: -1 });
     
     res.json(orders);
   } catch (error) {
+    console.log(error)
     res.status(500).json({ error: error.message });
   }
 }
@@ -472,13 +466,7 @@ async function updateOrder(req, res, next) {
 
 async function showOrder(req, res, next) {
   try {
-    const order = await Order.findById(req.query.id)
-      .populate({
-        path: 'productPurchases.product',
-        model: 'Product',
-        select: 'name price images description categoryName'
-      })
-      .populate('user', 'name email phone');
+    const order = await Order.findById(req.query.id);
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
@@ -492,23 +480,41 @@ async function showOrder(req, res, next) {
 
 async function deleteOrder(req, res, next) {
   try {
-    const order = await Order.findById(req.query.id);
+    const order = await Order.findById(req.query.orderID);
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    
+    /*let product;
+    let inc;
+    let quantities;
+    let quantity;
     // Restore product quantities if order is cancelled
     if (order.status === 'pending' || order.status === 'processing') {
-      for (const purchase of order.productPurchases) {
-        await Product.findByIdAndUpdate(
-          purchase.product,
-          { $inc: { quantity: purchase.quantity } }
+      for (const it of order.items) {
+        product = await Product.findById(
+          it.product
         );
+        for (const s of product.sizes) {
+          if (it.selectedSize==s) {
+            inc = s.indexOf()
+            console.log(inc);
+            quantities = product.quantities;
+            quantities[inc] = quantities[inc]+it.quantity;
+            quantity = product.quantity+it.quantity;
+
+          }
+            await Product.findByIdAndUpdate(
+          it.product,{
+            quantity:quantity,
+            quantities:quantities
+          }
+        );
+        }
       }
-    }
+    }*/
     
-    const deletedOrder = await Order.findByIdAndDelete(req.query.id);
+    const deletedOrder = await Order.findByIdAndDelete(req.query.orderID);
     res.json({ message: 'Order deleted successfully', order: deletedOrder });
   } catch (error) {
     res.status(500).json({ error: error.message });
