@@ -17,7 +17,7 @@ exports.createCheckoutSession = async (req, res) => {
       cancelUrl,
       currency
     } = req.body;
-
+console.log(items)
     // Create line items for Stripe
     const lineItems = items.map(item => ({
       price_data: {
@@ -26,11 +26,11 @@ exports.createCheckoutSession = async (req, res) => {
           name: item.name,
           description: item.selectedSize ? `Size: ${item.selectedSize}` : '',
           images: item.image ? [item.image] : [],
-          metadata: {
+        /*  metadata: {
             productId: item.product,
             selectedSize: item.selectedSize || '',
             selectedColor: item.selectedColor || ''
-          }
+          }*/
         },
         unit_amount: Math.round(item.price * 100), // Convert to cents
       },
@@ -77,11 +77,11 @@ exports.createCheckoutSession = async (req, res) => {
       /*shipping_address_collection: {
         allowed_countries: ['AE'], // Adjust as needed
       },*/
-      metadata: {
+    /*  metadata: {
        // customerInfo: JSON.stringify(customerInfo),
        // shippingInfo: JSON.stringify(shippingInfo),
-        originalItems: JSON.stringify(items)
-      },
+        originalItems: JSON.stringify(lineItems)
+      },*/
       // Optional: Pre-fill shipping address
       shipping_options: [
         {
@@ -107,9 +107,9 @@ exports.createCheckoutSession = async (req, res) => {
       sessionId: session.id,
       createdAt: new Date()
     });
-
+    
     await order.save();
-
+    console.log(order.items)
     res.status(200).json({
       sessionId: session.id,
       orderId: order._id,
