@@ -3,6 +3,89 @@ var mongoose = require("mongoose");
 var { orderSchema,productSchema } = require("../models/product");
 const Order = mongoose.model("Order", orderSchema);
 const Product = mongoose.model("Product", productSchema);
+const accountSid = process.env.ACCOUNTSID;
+const authToken = process.env.AUTHTOKEN;
+const client = require('twilio')(accountSid, authToken);
+const Resend  = require('resend');
+const resend = new Resend.Resend(process.env.RESEND_API_KEY);
+async function sendOrderNotifications(order, resend, client) {
+  if (!order) {
+    console.error("sendOrderNotifications was called without a valid order.");
+    return;
+  }
+
+  try {
+    const orderId = order._id.toString();
+    const totalAmount = (order.totalAmount).toFixed(2);
+    const currency = order.currency
+    console.log(currency)
+    // --- 1. Construct the detailed Email Body (HTML) ---
+    const emailHtml = `
+      <h1>🎉 New Order Received!</h1>
+      <p><strong>Order ID:</strong> ${orderId}</p>
+      <p><strong>Total Amount:</strong> ${currency} ${totalAmount}</p>
+      <hr>
+      <h2>👤 Customer Information</h2>
+      <ul>
+        <li><strong>Name:</strong> ${order.customerInfo.firstName} ${order.customerInfo.lastName}</li>
+        <li><strong>Email:</strong> ${order.customerInfo.email}</li>
+        <li><strong>Phone:</strong> ${order.customerInfo.phone || 'N/A'}</li>
+      </ul>
+      <h2>🚚 Shipping Address</h2>
+      <p>
+        ${order.shippingAddress.address}<br>
+        ${order.shippingAddress.city}, ${order.shippingAddress.state} ${order.shippingAddress.zipCode}<br>
+        ${order.shippingAddress.country}
+      </p>
+      <hr>
+      <h2>📦 Order Items</h2>
+      ${order.items.map(item => `
+        <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
+          <p><strong>Product:</strong> ${item.product.name}</p>
+          <p><strong>Quantity:</strong> ${item.quantity}</p>
+          <p><strong>Size:</strong> ${item.selectedSize}</p>
+          ${item.customSizeData && Object.keys(item.customSizeData).length > 0 ? `
+            <strong>Custom Measurements:</strong>
+            <ul>
+              ${item.customSizeData.bust ? `<li>Bust/Waist/Hips: ${item.customSizeData.bust}/${item.customSizeData.waist}/${item.customSizeData.hips}</li>` : ''}
+              ${item.customSizeData.sleeveLength ? `<li>Sleeve/Full Length: ${item.customSizeData.sleeveLength}/${item.customSizeData.fullLength}</li>` : ''}
+              ${item.customSizeData.additionalNotes ? `<li>Notes: ${item.customSizeData.additionalNotes}</li>` : ''}
+            </ul>
+          ` : ''}
+        </div>
+      `).join('')}
+    `;
+
+    // --- 2. Construct the short SMS Alert Body ---
+    const smsBody = `New SilkSoul Order #${orderId} for ${currency} ${totalAmount}. Check your email for details.`;
+
+    // --- 3. Send both notifications concurrently using Promise.allSettled ---
+    // This ensures that even if one fails, the other will still be attempted.
+    //const notificationPromises = [
+      const email = await resend.emails.send({
+        from: 'orders@silksoul.me', // IMPORTANT: Change to your verified Resend 'from' address
+        to: process.env.EMAIL, // Add ADMIN_EMAIL to your .env file
+        subject: `New Order Received: #${orderId}`,
+        html: emailHtml,
+      });
+      console.log(email)
+      const msg = await client.messages.create({
+        to: process.env.DESTINATION_NUMBER,
+        from: process.env.SENDER_NUMBER,
+        body: smsBody,
+      });
+      console.log(msg)
+   // ];
+
+   // const results = await Promise.allSettled(notificationPromises);
+
+   
+
+  } catch (error) {
+    console.error(`An unexpected error occurred while sending notifications for order ${order._id}:`, error);
+  }
+}
+
 // Create Checkout Session
 exports.createCheckoutSession = async (req, res) => {
   try {
@@ -101,6 +184,7 @@ console.log(items)
     const order = new Order({
       items,
       totalAmount,
+      currency:currency,
       customerInfo,
       shippingAddress: shippingInfo,
       paymentStatus: 'pending',
@@ -109,7 +193,7 @@ console.log(items)
     });
     
     await order.save();
-    console.log(order.items)
+    console.log(order)
     res.status(200).json({
       sessionId: session.id,
       orderId: order._id,
@@ -187,11 +271,10 @@ exports.getCheckoutSession = async (req, res) => {
 
 // Webhook handler for Stripe events
 exports.handleWebhook = async (req, res) => {
-    console.log(req.headers)
-    console.log(req.body)
+   
   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-console.log(endpointSecret)
+//console.log(endpointSecret)
   let event;
 
   try {
@@ -282,6 +365,7 @@ console.log(endpointSecret)
       }
 
       console.log('Checkout session completed:', session.id);
+      await sendOrderNotifications(updatedOrder, resend, client);
       break;
 
     case 'checkout.session.async_payment_succeeded':
@@ -316,27 +400,34 @@ console.log(endpointSecret)
       console.log('Async payment failed:', failedAsyncSession.id);
       break;
 
-    case 'payment_intent.succeeded':
+             case 'payment_intent.succeeded':
       const paymentIntent = event.data.object;
+      console.log('Processing payment_intent.succeeded:', paymentIntent.id);
       
-      // Update order by payment intent ID (backup)
-      const updatedPaymentOrder = await Order.findOneAndUpdate(
-        { paymentIntentId: paymentIntent.id },
-        { 
-          paymentStatus: 'paid',
-          paidAt: new Date()
-        },
-        { new: true }
-      );
+      try {
+        const updatedPaymentOrder = await Order.findOneAndUpdate(
+          { paymentIntentId: paymentIntent.id },
+          { paymentStatus: 'paid', paidAt: new Date() },
+          { new: true }
+        ).populate('items.product'); // Ensure product data is populated for the notification
 
-      // Update inventory
-      if (updatedPaymentOrder) {
-        await updateInventory(updatedPaymentOrder);
+        if (updatedPaymentOrder) {
+          // 1. Update inventory (critical step)
+          await updateInventory(updatedPaymentOrder);
+          
+          // 2. Send notifications (non-critical, can run in the background)
+          // Ensure your resend and twilio clients are available here
+          await sendOrderNotifications(updatedPaymentOrder, resend, client);
+
+          console.log(`Successfully processed order for paymentIntentId: ${paymentIntent.id}`);
+        } else {
+          console.warn(`Order not found for payment_intent.succeeded with ID: ${paymentIntent.id}. This might happen if the order was already processed.`);
+        }
+      } catch (error) {
+        console.error(`Error processing payment_intent.succeeded for ID ${paymentIntent.id}:`, error);
+        // Optional: You could send an alert here about the processing failure
       }
-
-      console.log('Payment intent succeeded:', paymentIntent.id);
       break;
-
     case 'payment_intent.payment_failed':
       const failedPayment = event.data.object;
       

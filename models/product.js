@@ -49,6 +49,7 @@ const orderSchema = new mongoose.Schema({
     selectedColor: String
   }],
   totalAmount: Number,
+  currency:String,
   customerInfo: {
     email: String,
     firstName: String,

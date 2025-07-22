@@ -34,7 +34,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           port: ${{ secrets.PORT }}
           key: ${{ secrets.SSHKEY }}
-          envs: MONGODB_URL,CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET,JWT_KEY,ADMIN_USERNAME,ADMIN_EMAIL,ADMIN_PASSWORD,STRIPE_SECRET_KEY,STRIPE_PUBLISHABLE_KEY,STRIPE_WEBHOOK_SECRET
+          envs: MONGODB_URL,CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET,JWT_KEY,ADMIN_USERNAME,ADMIN_EMAIL,ADMIN_PASSWORD,STRIPE_SECRET_KEY,STRIPE_PUBLISHABLE_KEY,STRIPE_WEBHOOK_SECRET,DESTINATION_NUMBER,SENDER_NUMBER,ACCOUNTSID,AUTHTOKEN,RESEND_API_KEY,EMAIL
           script: |
             cd /var/www/Silksoul-Backend
             
@@ -51,6 +51,12 @@ jobs:
             STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
             STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            DESTINATION_NUMBER=${{ secrets.DESTINATION_NUMBER }}
+            SENDER_NUMBER=${{ secrets.SENDER_NUMBER }}
+            ACCOUNTSID=${{ secrets.ACCOUNTSID }}
+            AUTHTOKEN=${{ secrets.AUTHTOKEN }}
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            EMAIL=${{ secrets.EMAIL }}
             EOF
             
             # Set proper permissions for .env file
