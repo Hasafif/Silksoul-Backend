@@ -19,7 +19,7 @@ var app = express();
 global.__basedir = __dirname;
 
 var corsOptions = {
- origin: ['http://localhost:8000', 'http://localhost:5173','http://admin.silksoul.me','https://admin.silksoul.me','https://silksoul.me'],
+ origin: ['http://localhost:8000', 'http://localhost:5173','http://localhost:3000','http://admin.silksoul.me','https://admin.silksoul.me','https://silksoul.me','http://silksoul.me','https://api.silksoul.me','http://api.silksoul.me'],
  optionsSuccessStatus: 200
 }
 
