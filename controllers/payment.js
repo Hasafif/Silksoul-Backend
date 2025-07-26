@@ -17,8 +17,8 @@ async function sendOrderNotifications(order, resend, client) {
   try {
     const orderId = order._id.toString();
     const totalAmount = (order.totalAmount).toFixed(2);
-    const currency = order.currency
-    console.log(currency)
+    const currency = order.currency;
+
     // --- 1. Construct the detailed Email Body (HTML) ---
     const emailHtml = `
       <h1>🎉 New Order Received!</h1>
@@ -44,14 +44,16 @@ async function sendOrderNotifications(order, resend, client) {
           <p><strong>Product:</strong> ${item.name}</p>
           <p><strong>Quantity:</strong> ${item.quantity}</p>
           <p><strong>Size:</strong> ${item.selectedSize}</p>
-          ${item.customSizeData && Object.keys(item.customSizeData).length > 0 ? `
+          
+          ${item.customSizeData ? `
             <strong>Custom Measurements:</strong>
             <ul>
-              ${item.customSizeData.bust ? `<li>Bust/Waist/Hips: ${item.customSizeData.bust}/${item.customSizeData.waist}/${item.customSizeData.hips}</li>` : ''}
-              ${item.customSizeData.sleeveLength ? `<li>Sleeve/Full Length: ${item.customSizeData.sleeveLength}/${item.customSizeData.fullLength}</li>` : ''}
-              ${item.customSizeData.additionalNotes ? `<li>Notes: ${item.customSizeData.additionalNotes}</li>` : ''}
+              ${Object.entries(item.customSizeData).map(([key, value]) => 
+                (value ? `<li><strong>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</strong> ${value}</li>` : '')
+              ).join('')}
             </ul>
           ` : ''}
+
         </div>
       `).join('')}
     `;
@@ -59,33 +61,26 @@ async function sendOrderNotifications(order, resend, client) {
     // --- 2. Construct the short SMS Alert Body ---
     const smsBody = `New SilkSoul Order #${orderId} for ${currency} ${totalAmount}. Check your email for details.`;
 
-    // --- 3. Send both notifications concurrently using Promise.allSettled ---
-    // This ensures that even if one fails, the other will still be attempted.
-    //const notificationPromises = [
-      const email = await resend.emails.send({
-        from: 'orders@silksoul.me', // IMPORTANT: Change to your verified Resend 'from' address
-        to: process.env.EMAIL, // Add ADMIN_EMAIL to your .env file
-        subject: `New Order Received: #${orderId}`,
-        html: emailHtml,
-      });
-      console.log(email)
-      const msg = await client.messages.create({
-        to: process.env.DESTINATION_NUMBER,
-        from: process.env.SENDER_NUMBER,
-        body: smsBody,
-      });
-      console.log(msg)
-   // ];
+    // --- 3. Send both notifications concurrently ---
+    const email = await resend.emails.send({
+      from: 'orders@silksoul.me',
+      to: process.env.EMAIL,
+      subject: `New Order Received: #${orderId}`,
+      html: emailHtml,
+    });
+    console.log(email);
 
-   // const results = await Promise.allSettled(notificationPromises);
-
-   
+    const msg = await client.messages.create({
+      to: process.env.DESTINATION_NUMBER,
+      from: process.env.SENDER_NUMBER,
+      body: smsBody,
+    });
+    console.log(msg);
 
   } catch (error) {
     console.error(`An unexpected error occurred while sending notifications for order ${order._id}:`, error);
   }
 }
-
 // Create Checkout Session
 exports.createCheckoutSession = async (req, res) => {
   try {
@@ -417,7 +412,7 @@ exports.handleWebhook = async (req, res) => {
           
           // 2. Send notifications (non-critical, can run in the background)
           // Ensure your resend and twilio clients are available here
-          await sendOrderNotifications(updatedPaymentOrder, resend, client);
+          //await sendOrderNotifications(updatedPaymentOrder, resend, client);
 
           console.log(`Successfully processed order for paymentIntentId: ${paymentIntent.id}`);
         } else {
