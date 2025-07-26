@@ -45,7 +45,7 @@ async function sendOrderNotifications(order, resend, client) {
           <p><strong>Quantity:</strong> ${item.quantity}</p>
           <p><strong>Size:</strong> ${item.selectedSize}</p>
           
-          ${item.customSizeData ? `
+          ${item.selectedSize==='custom' ? `
             <strong>Custom Measurements:</strong>
             <ul>
               ${Object.entries(item.customSizeData).map(([key, value]) => 
