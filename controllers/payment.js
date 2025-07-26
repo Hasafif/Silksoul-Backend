@@ -41,7 +41,7 @@ async function sendOrderNotifications(order, resend, client) {
       <h2>📦 Order Items</h2>
       ${order.items.map(item => `
         <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
-          <p><strong>Product:</strong> ${item.product.name}</p>
+          <p><strong>Product:</strong> ${item.name}</p>
           <p><strong>Quantity:</strong> ${item.quantity}</p>
           <p><strong>Size:</strong> ${item.selectedSize}</p>
           ${item.customSizeData && Object.keys(item.customSizeData).length > 0 ? `
