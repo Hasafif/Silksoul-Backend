@@ -116,7 +116,7 @@ console.log(items)
     }));
 
     // Add shipping as a line item if applicable
-    if (shippingCost > 0) {
+    /*if (shippingCost > 0) {
       lineItems.push({
         price_data: {
           currency: currency,
@@ -127,9 +127,10 @@ console.log(items)
         },
         quantity: 1,
       });
-    }
+    }*/
 
     // Add tax as a line item
+    /*
     if (taxAmount > 0) {
       lineItems.push({
         price_data: {
@@ -141,7 +142,7 @@ console.log(items)
         },
         quantity: 1,
       });
-    }
+    }*/
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
