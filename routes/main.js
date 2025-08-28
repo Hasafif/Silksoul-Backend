@@ -7,6 +7,7 @@ var {
   listRecentProducts, // Retrieve recently created products
   listRecentShops, // Retrieve recently created shops
   listProductsByCategory,
+  listProductsByCategoryName,
   showCategory, // Retrieve one single product category
   showShop, // Retrieve one single shop
   showProduct, // Retrieve one single product
@@ -32,6 +33,7 @@ router.get("/site", showSite);
 router.get("/category/all", listAllCategories);
 router.get("/product/recent", listRecentProducts);
 router.get("/product/category", listProductsByCategory);
+router.get("/product/categoryname", listProductsByCategoryName);
 router.get("/product", getProduct);
 router.get("/category", getCategory);
 router.get("/shop/recent", listRecentShops);

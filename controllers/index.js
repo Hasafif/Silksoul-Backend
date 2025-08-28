@@ -65,6 +65,15 @@ res.json(await Product.find({category:req.query.categoryID}));
     res.status(500).json({ error: error.message });
   }
 }
+async function listProductsByCategoryName(req, res, next) {
+  
+     try {
+res.json(await Product.find({categoryName_english:req.query.categoryName}));
+  } catch (error) {
+    console.error('Error fetching category products:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
 // Retrieve recently created shops
 async function listRecentShops(req, res, next) {
   res.json(await Shop.find({}).sort({ created_at: -1 }).limit(15));
@@ -149,6 +158,7 @@ module.exports = {
   listAllCategories,
   listRecentProducts,
   listProductsByCategory,
+  listProductsByCategoryName,
   getProduct,
   getCategory,
   listRecentShops,

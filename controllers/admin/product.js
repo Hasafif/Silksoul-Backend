@@ -190,58 +190,77 @@ res.json(await Product.find({}).populate("category"));
 
 async function createProduct(req, res, next) {
   try {
-   console.log(req.body);
+   // console.log(req.body);
+
+    // Expecting req.body.colors to be an array of color objects:
+    // [{ color: "Red", colorDeg: "#FF0000" }, { color: "Blue", colorDeg: "#0000FF" }]
+    const colorsData = req.body.colors || [];
+    const files = req.files || []; // flat array of uploaded files
+    console.log(colorsData)
+    const colors = [];
+    console.log(files)
+    for (let i = 0; i < colorsData.length; i++) {
+      const colorObj = colorsData[i];
+
+      // Filter files for this color based on fieldname convention: "color-0", "color-1", etc.
+      const colorFiles = files.filter(f => f.fieldname === `color-${i}`);
+      console.log(colorFiles)
+      // Upload images for this color
+      let uploadedImages = [];
+      if (colorFiles.length > 0) {
+        uploadedImages = await uploadImagesToCloudinary(colorFiles);
+        // console.log(uploadedImages)
     
-    let uploadedImages = [];
-    //console.log(req.body.images)
-    // Upload images to Cloudinary if provided
-    if (req.files && req.files.length > 0) {
-      console.log(req.files)
-      uploadedImages = await uploadImagesToCloudinary(req.files);
+      }
+ console.log(uploadedImages)
+    
+      const images = uploadedImages.map(img => img.url);
+      const images_ids = uploadedImages.map(img => img.public_id);
+
+      colors.push({
+        color: colorObj.color,
+        colorDeg: colorObj.colorDeg,
+        images: images,
+        images_ids: images_ids
+      });
     }
-   console.log(uploadedImages)
-    
+
     // Find category if categoryname is provided
     let category = null;
     if (req.body.categoryname) {
       category = await ProductCategory.findOne({ name_english: req.body.categoryname });
     }
-    console.log(category)
-    const images = [];
-    const images_ids = [];
-    uploadedImages.forEach((img)=>{
-images.push(img.url)
-images_ids.push(img.public_id)
-    })
-    console.log(images)
-    console.log(images_ids)
-    const sizes = req.body.sizes?.filter(size => size) || [];
-    const quantities = req.body.quantities?.filter(qty => qty) || [];
+
+  // This ensures 'sizes' is always an array, even if only one is sent.
+const sizes = [].concat(req.body.sizes || []).filter(size => size);
+
+// Do the same for 'quantities' before filtering and mapping.
+const quantities = [].concat(req.body.quantities || [])
+  .filter(qty => qty)
+  .map(Number);
+
     const newProduct = new Product({
       name_english: req.body.name_english,
       name_arabic: req.body.name_arabic,
-      images: images, 
-      images_ids:images_ids,
-      // Store the uploaded image data
+      colors: colors,
       price: req.body.price,
       quantity: req.body.quantity,
       sizes: sizes,
       quantities: quantities,
       description_english: req.body.description_english,
       description_arabic: req.body.description_arabic,
-      color: req.body.color,
       category: category ? category._id : null,
       categoryName_english: req.body.categoryname,
-      categoryName_arabic: category  ? category.name_arabic: ''
+      categoryName_arabic: category ? category.name_arabic : ''
     });
-    
+    console.log(newProduct)
     await newProduct.save();
+
     res.status(201).json({
       success: true,
-      message: 'Product created successfully',
-      //product: newProduct
+      message: 'Product created successfully'
     });
-    
+
   } catch (error) {
     console.error('Error creating product:', error);
     res.status(500).json({
@@ -254,73 +273,93 @@ images_ids.push(img.public_id)
 
 async function updateProduct(req, res, next) {
   try {
-    const existingProduct = await Product.findById(req.body.id);
-    if (!existingProduct) {
-      return res.status(404).json({ error: 'Product not found' });
+    // 1. PARSE INCOMING DATA
+    const { id, name_english, name_arabic, price, sizes, quantities, categoryname, description_english, description_arabic } = req.body;
+    
+    // Data for color variants will be sent as stringified JSON
+    const existingColorsData = JSON.parse(req.body.existingColors || '[]');
+    const newColorsData = JSON.parse(req.body.newColors || '[]');
+    const files = req.files || [];
+
+    // 2. FIND THE PRODUCT AND CATEGORY
+    const productToUpdate = await Product.findById(id);
+    if (!productToUpdate) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
     }
-      // Find category if categoryname is provided
-    let category = null;
-    if (req.body.categoryname) {
-      category = await ProductCategory.findOne({ name_english: req.body.categoryname });
+    const category = await ProductCategory.findOne({ name_english: categoryname });
+
+    // 3. HANDLE IMAGE DELETION
+    // Figure out which images were removed by comparing the original list with the list of kept images sent from the frontend
+    const originalImageIds = productToUpdate.colors.flatMap(c => c.images_ids);
+    const keptImageIds = existingColorsData.flatMap(c => c.images_ids);
+    const imageIdsToDelete = originalImageIds.filter(id => !keptImageIds.includes(id));
+    
+    if (imageIdsToDelete.length > 0) {
+      await deleteImagesFromCloudinary(imageIdsToDelete);
     }
-    let updatedImages = [];
-    console.log(req.files.length)
-    // If new images are provided, upload them and delete old ones
-    if (req.files && req.files.length > 0) {
-      // Delete old images from Cloudinary
-      if (existingProduct.images && existingProduct.images.length > 0) {
-        const oldPublicIds = existingProduct.images_ids;
-        await deleteImagesFromCloudinary(oldPublicIds);
+
+    const finalColors = [];
+
+    // 4. PROCESS EXISTING COLORS (add new images to them)
+    for (const colorData of existingColorsData) {
+      const newFilesForThisColor = files.filter(f => f.fieldname === `existing-color-${colorData._id}`);
+      let newUploadedImages = [];
+      if (newFilesForThisColor.length > 0) {
+        newUploadedImages = await uploadImagesToCloudinary(newFilesForThisColor);
       }
       
-      // Upload new images
-      updatedImages = await uploadImagesToCloudinary(req.files);
+      finalColors.push({
+        _id: colorData._id,
+        color: colorData.color,
+        colorDeg: colorData.colorDeg,
+        images: [...colorData.images, ...newUploadedImages.map(img => img.url)],
+        images_ids: [...colorData.images_ids, ...newUploadedImages.map(img => img.public_id)]
+      });
     }
-const images = req.body.existingImages?.filter(img => img) || [];
-     console.log(images)
-     const images_ids = req.body.existingImages_ids?.filter(id=>id) || [];
 
-    console.log(images_ids);
-    console.log(updatedImages.length)
-    if (updatedImages.length>0) {
- updatedImages.forEach((img)=>{
-images.push(img.url)
-images_ids.push(img.public_id)
-    })
-    }
-       const sizes = req.body.sizes?.filter(size => size) || [];
-    const quantities = req.body.quantities?.filter(qty => qty) || [];
-   
-    const updatedProduct = await Product.findByIdAndUpdate(
-      req.body.id,
-      {
-        name_english: req.body.name_english,
-         name_arabic: req.body.name_arabic,
-        images: images,
-        images_ids:images_ids,
-        color:req.body.color,
-        price: req.body.price,
-        quantity: req.body.quantity,
-        sizes:sizes,
-        quantities:quantities,
-        description_english: req.body.description_english,
-         description_arabic: req.body.description_arabic,
-          category: category ? category._id : null,
-      categoryName_english: req.body.categoryname,
-      categoryName_arabic: category  ? category.name_arabic: ''
-      },
-      {
-        new: true,
+    // 5. PROCESS NEW COLORS (upload their images)
+    for (let i = 0; i < newColorsData.length; i++) {
+      const newColor = newColorsData[i];
+      const filesForThisNewColor = files.filter(f => f.fieldname === `new-color-${i}`);
+      let uploadedImages = [];
+      if (filesForThisNewColor.length > 0) {
+        uploadedImages = await uploadImagesToCloudinary(filesForThisNewColor);
       }
-    );
-    
-    res.json(updatedProduct);
+      
+      finalColors.push({
+        color: newColor.color,
+        colorDeg: newColor.colorDeg,
+        images: uploadedImages.map(img => img.url),
+        images_ids: uploadedImages.map(img => img.public_id)
+      });
+    }
+
+    // 6. UPDATE AND SAVE THE PRODUCT
+    const totalQuantity = [].concat(quantities || []).filter(q => q).map(Number).reduce((sum, qty) => sum + qty, 0);
+
+    productToUpdate.set({
+      name_english,
+      name_arabic,
+      price,
+      description_english,
+      description_arabic,
+      category: category ? category._id : productToUpdate.category,
+      categoryName_english: categoryname,
+      categoryName_arabic: category ? category.name_arabic : productToUpdate.categoryName_arabic,
+      sizes: [].concat(sizes || []).filter(s => s),
+      quantities: [].concat(quantities || []).filter(q => q).map(Number),
+      quantity: totalQuantity,
+      colors: finalColors
+    });
+
+    const updatedProduct = await productToUpdate.save();
+    res.status(200).json(updatedProduct);
+
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(500).json({ error: error.message });
   }
 }
-
 async function showProduct(req, res, next) {
   try {
  res.json(await Product.findById(req.query.productID));

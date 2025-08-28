@@ -5,10 +5,9 @@ const Order = mongoose.model("Order", orderSchema);
 const Product = mongoose.model("Product", productSchema);
 const accountSid = process.env.ACCOUNTSID;
 const authToken = process.env.AUTHTOKEN;
-const client = require('twilio')(accountSid, authToken);
 const Resend  = require('resend');
 const resend = new Resend.Resend(process.env.RESEND_API_KEY);
-async function sendOrderNotifications(order, resend, client) {
+async function sendOrderNotifications(order, resend) {
   if (!order) {
     console.error("sendOrderNotifications was called without a valid order.");
     return;
@@ -44,7 +43,8 @@ async function sendOrderNotifications(order, resend, client) {
           <p><strong>Product:</strong> ${item.name}</p>
           <p><strong>Quantity:</strong> ${item.quantity}</p>
           <p><strong>Size:</strong> ${item.selectedSize}</p>
-          
+          <p><strong>Color:</strong> ${item.selectedColor.color}</p>
+
           ${item.selectedSize==='custom' ? `
             <strong>Custom Measurements:</strong>
             <ul>
@@ -58,10 +58,8 @@ async function sendOrderNotifications(order, resend, client) {
       `).join('')}
     `;
 
-    // --- 2. Construct the short SMS Alert Body ---
-    const smsBody = `New SilkSoul Order #${orderId} for ${currency} ${totalAmount}. Check your email for details.`;
-
-    // --- 3. Send both notifications concurrently ---
+  
+    // --- 2. Send Email notifications ---
     const email = await resend.emails.send({
       from: 'orders@silksoul.me',
       to: process.env.EMAIL,
@@ -69,13 +67,6 @@ async function sendOrderNotifications(order, resend, client) {
       html: emailHtml,
     });
     console.log(email);
-
-    const msg = await client.messages.create({
-      to: process.env.DESTINATION_NUMBER,
-      from: process.env.SENDER_NUMBER,
-      body: smsBody,
-    });
-    console.log(msg);
 
   } catch (error) {
     console.error(`An unexpected error occurred while sending notifications for order ${order._id}:`, error);
@@ -97,52 +88,35 @@ exports.createCheckoutSession = async (req, res) => {
     } = req.body;
 console.log(items)
     // Create line items for Stripe
-    const lineItems = items.map(item => ({
-      price_data: {
-        currency: currency,
-        product_data: {
-          name: item.name,
-          description: item.selectedSize ? `Size: ${item.selectedSize}` : '',
-          images: item.image ? [item.image] : [],
-        /*  metadata: {
-            productId: item.product,
-            selectedSize: item.selectedSize || '',
-            selectedColor: item.selectedColor || ''
-          }*/
-        },
-        unit_amount: Math.round(item.price * 100), // Convert to cents
-      },
-      quantity: item.quantity,
-    }));
-
-    // Add shipping as a line item if applicable
-    /*if (shippingCost > 0) {
-      lineItems.push({
+    const lineItems = items.map(item => {
+      // --- NEW LOGIC: Dynamically build the description ---
+      const descriptionParts = [];
+      if (item.selectedSize) {
+        descriptionParts.push(`Size: ${item.selectedSize === 'custom' ? 'Custom' : item.selectedSize}`);
+      }
+      if (item.selectedColor && item.selectedColor.color) {
+        descriptionParts.push(`Color: ${item.selectedColor.color}`);
+      }
+      
+      return {
         price_data: {
           currency: currency,
           product_data: {
-            name: 'Shipping',
+            // MODIFIED: Use a consistent name field, like name_english
+            name: item.name,
+            
+            // MODIFIED: Use the dynamically created description
+            description: descriptionParts.join(' | '), // Example: "Size: M | Color: Sage Green"
+            
+            // MODIFIED: Use the first image from the selected color, with a fallback
+            images: item.selectedColor?.images?.[0] ? [item.selectedColor.images[0]] : [item.image],
           },
-          unit_amount: Math.round(shippingCost * 100),
+          unit_amount: Math.round(item.price * 100), // Convert to cents
         },
-        quantity: 1,
-      });
-    }*/
-
-    // Add tax as a line item
-    /*
-    if (taxAmount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: currency,
-          product_data: {
-            name: 'Tax',
-          },
-          unit_amount: Math.round(taxAmount * 100),
-        },
-        quantity: 1,
-      });
-    }*/
+        quantity: item.quantity,
+      };
+    });
+   
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
@@ -153,14 +127,7 @@ console.log(items)
       cancel_url: cancelUrl,
       customer_email: customerInfo.email,
       billing_address_collection: 'required',
-      /*shipping_address_collection: {
-        allowed_countries: ['AE'], // Adjust as needed
-      },*/
-    /*  metadata: {
-       // customerInfo: JSON.stringify(customerInfo),
-       // shippingInfo: JSON.stringify(shippingInfo),
-        originalItems: JSON.stringify(lineItems)
-      },*/
+  
       // Optional: Pre-fill shipping address
       shipping_options: [
         {
@@ -361,7 +328,7 @@ exports.handleWebhook = async (req, res) => {
       }
 
       console.log('Checkout session completed:', session.id);
-      await sendOrderNotifications(updatedOrder, resend, client);
+      await sendOrderNotifications(updatedOrder, resend);
       break;
 
     case 'checkout.session.async_payment_succeeded':

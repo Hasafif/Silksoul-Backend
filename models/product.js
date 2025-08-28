@@ -47,7 +47,18 @@ const orderSchema = new mongoose.Schema({
     additionalNotes: String,
   },
     selectedSize: String,
-    selectedColor: String
+        // --- MODIFIED SECTION START ---
+    selectedColor: {
+      type: {
+        _id: mongoose.Schema.Types.ObjectId,
+        color: String,    // e.g., "Sage Green"
+        colorDeg: String, // e.g., "#a4ad98"
+        images: [String],  // e.g., ["/p12.jpeg"]
+        images_ids: [String]  // e.g., ["/p12.jpeg"]
+      },
+      // Set type to Object for Mongoose to handle the nested structure
+      _id: false // Prevents Mongoose from creating a separate _id for the sub-document
+    }
   }],
   totalAmount: Number,
   currency:String,
@@ -78,6 +89,7 @@ const orderSchema = new mongoose.Schema({
   cancelledAt: Date
 });
 // Product Schema with working middleware
+/*
 const productSchema = new Schema(
   {
     name_english: { type: String, required: true },
@@ -102,7 +114,50 @@ const productSchema = new Schema(
       updatedAt: "updated_at",
     },
   }
+);*/
+const productSchema = new Schema(
+  {
+    name_english: { type: String, required: true },
+    name_arabic: { type: String, required: true },
+
+    // Colors with images, image IDs, and colorDeg
+    colors: [
+      {
+        color: { type: String, required: true },       // e.g., "Red"
+        colorDeg: { type: String, required: true },    // e.g., "#FF0000" or "255,0,0"
+        images: [{ type: String, required: true }],    // URLs or file paths
+        images_ids: [{ type: String, required: true }] // Cloudinary IDs or similar
+      },
+    ],
+
+    price: { type: Number, required: true },
+    description_english: { type: String },
+    description_arabic: { type: String },
+    sizes: [{ type: String }],
+
+    quantities: [{ type: Number, required: true }],
+    quantity: { type: Number, required: true },
+
+    categoryName_english: { type: String, required: true },
+    categoryName_arabic: { type: String, required: true },
+
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: "ProductCategory",
+      required: true,
+    },
+
+    reviews: [{ type: Schema.Types.ObjectId, ref: "Review" }],
+  },
+  {
+    timestamps: {
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+    },
+  }
 );
+
+
 // AUTO-SYNC: Add product to category when created
 productSchema.post('save', async function(doc, next) {
   try {

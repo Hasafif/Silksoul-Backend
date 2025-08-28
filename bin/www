@@ -8,7 +8,7 @@ var debug = require('debug')('your-app:server');
 var http = require('http');
 var mongoose = require('mongoose');
 var { initializeAdminUser } = require('../utils/adminInit'); // Adjust path as needed
-
+var { migrate,migrateOrders } = require('../utils/migration_script'); 
 /**
  * Get port from environment and store in Express.
  */
@@ -32,7 +32,9 @@ async function startServer() {
     
     // Initialize admin user
     await initializeAdminUser();
-    
+    await migrate();
+    await migrateOrders();
+
     // Start server
     server.listen(port);
     server.on('error', onError);

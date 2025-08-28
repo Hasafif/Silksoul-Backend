@@ -94,12 +94,12 @@ var {
 router.get("/product/list", listProduct);
 router.get("/product/show", showProduct);
 //router.post("/product/create", createProduct);
-router.post('/product/create',upload.array('images'), (req, res) => {
-  //console.log(req.body); // Regular form fields
-  createProduct(req,res);
-  console.log(req.files); // Array of uploaded files
+router.post('/product/create', upload.any(), (req, res) => {
+  // Now req.files will be populated with all files, 
+  // each with a 'fieldname' like 'color-0', 'color-1', etc.
+  createProduct(req, res); 
 });
-router.put('/product/update',upload.array('images'), (req, res) => {
+router.put('/product/update',upload.any(), (req, res) => {
   //console.log(req.body); // Regular form fields
   updateProduct(req,res);
   console.log(req.body); // Array of uploaded files
